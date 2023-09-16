@@ -94,6 +94,49 @@ impl Modifiers {
     }
 }
 
+#[derive(Clone)]
+struct History {
+    history: Vec<PathBuf>,
+    position: usize,
+}
+
+impl History {
+    fn new(start_dir: PathBuf) -> Self {
+        Self {
+            history: vec![start_dir],
+            position: 0,
+        }
+    }
+
+    fn current_dir(&self) -> PathBuf {
+        self.history[self.position].clone()
+    }
+
+    fn navigate_to(&mut self, folder: String) {
+        self.history.truncate(self.position + 1);
+        let mut new_dir = self.current_dir();
+        new_dir.push(folder);
+        self.history.push(new_dir);
+        self.position += 1;
+    }
+
+    fn can_go_forward(&self) -> bool {
+        self.position >= self.history.len() - 1
+    }
+
+    fn forward(&mut self) {
+        self.position += 1;
+    }
+
+    fn can_go_back(&self) -> bool {
+        self.position == 0
+    }
+
+    fn back(&mut self) {
+        self.position -= 1;
+    }
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     let (search_term, set_search_term) = create_signal(String::new());
@@ -101,8 +144,8 @@ pub fn App() -> impl IntoView {
     let (search_results, set_search_results) = create_signal(Vec::new());
     let (is_searching, set_searching) = create_signal(false);
     let (file_list_params, set_file_list_params) = create_signal(FileListParams::new());
-    let (current_dir, set_current_dir) = create_signal(PathBuf::from(r"C:\Users\Andrew\Downloads"));
     let (modifiers, set_modifiers) = create_signal(Modifiers::new());
+    let history = create_rw_signal(History::new(PathBuf::from(r"C:\Users\Andrew\Downloads")));
 
     let update_search_term = move |ev| {
         let value = event_target_value(&ev);
@@ -113,7 +156,7 @@ pub fn App() -> impl IntoView {
         ev.prevent_default();
         spawn_local(async move {
             let args = to_value(&SearchArgs {
-                dir: current_dir.get_untracked(),
+                dir: history.with(|h| h.current_dir()),
                 searchTerm: search_term.get_untracked(),
             })
             .unwrap();
@@ -129,7 +172,7 @@ pub fn App() -> impl IntoView {
     let get_file_list = move || {
         spawn_local(async move {
             let args = to_value(&FileListArgs {
-                dir: current_dir.get_untracked(),
+                dir: history.with_untracked(|h| h.current_dir()),
             })
             .unwrap();
             let files = invoke("files_in_dir", args).await.as_string().unwrap();
@@ -224,11 +267,11 @@ pub fn App() -> impl IntoView {
         if !is_searching() {
             match file.info().file_type {
                 FileType::Folder => {
-                    set_current_dir.update(|dir| dir.push(file.info().name));
+                    history.update(|history| history.navigate_to(file.info().name));
                     get_file_list();
                 }
                 FileType::File => {
-                    let mut file_dir = current_dir.get_untracked();
+                    let mut file_dir = history.with(|h| h.current_dir());
                     file_dir.push(file.info().name);
                     open_file(file_dir);
                 }
@@ -269,8 +312,20 @@ pub fn App() -> impl IntoView {
 
     get_file_list();
 
+    let go_back = move |_| {
+        history.update(|h| h.back());
+        get_file_list();
+    };
+
+    let go_forward = move |_| {
+        history.update(|h| h.forward());
+        get_file_list();
+    };
+
     view! {
         <div class="top-bar">
+            <button on:click=go_back disabled=move || history.with(|h| h.can_go_back())>"⬅"</button>
+            <button on:click=go_forward disabled=move || history.with(|h| h.can_go_forward())>"➡"</button>
             <form on:submit=search>
                 <input
                     id="search-box"

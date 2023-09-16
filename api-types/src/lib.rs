@@ -14,10 +14,10 @@ impl From<&fs::Metadata> for FileType {
     fn from(value: &fs::Metadata) -> Self {
         if value.is_dir() {
             FileType::Folder
-        } else if value.is_symlink() {
-            FileType::SymLink
         } else if value.is_file() {
             FileType::File
+        } else if value.is_symlink() {
+            unreachable!("Incorrectly processed symlink");
         } else {
             unreachable!("Unrecognised file type");
         }

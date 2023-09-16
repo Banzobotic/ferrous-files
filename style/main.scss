@@ -16,7 +16,8 @@
 
 .top-bar {
     padding-top: 1vh;
-    text-align: center;
+    display: flex;
+    justify-content: center;
 }
 
 input,
