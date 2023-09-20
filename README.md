@@ -1,6 +1,6 @@
-# Tauri + Leptos
+# Ferrous Files
 
-This template should help get you started developing with Tauri and Leptos.
+An alternative file explorer for Windows
 
 ## Recommended IDE Setup
 

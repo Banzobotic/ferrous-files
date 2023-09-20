@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum FileType {
     Folder,
-    SymLink,
     File,
 }
 
@@ -31,14 +30,15 @@ pub struct FileInfo {
     pub size: u64,
     pub item_count: Option<usize>,
     pub last_modified: DateTime<Local>,
+    pub full_path: Option<PathBuf>,
 }
 
 impl FileInfo {
-    pub fn new(path: PathBuf) -> Self {
+    pub fn new(path: PathBuf, search_result: bool) -> Self {
         let name = path.file_name().unwrap().to_str().unwrap().to_owned();
         let metadata = &path.metadata().unwrap();
 
-        let item_count = fs::read_dir(path).map(|r| r.count()).ok();
+        let item_count = fs::read_dir(path.clone()).map(|r| r.count()).ok();
 
         FileInfo {
             name,
@@ -46,6 +46,7 @@ impl FileInfo {
             size: metadata.len(),
             item_count,
             last_modified: metadata.modified().unwrap().into(),
+            full_path: if search_result { Some(path) } else { None },
         }
     }
 }
@@ -75,7 +76,6 @@ impl FileInfo {
                     format!("{item_count} items")
                 }
             }
-            FileType::SymLink => String::new(),
         }
     }
 }
